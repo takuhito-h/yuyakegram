@@ -1,0 +1,286 @@
+<!DOCTYPE HTML>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ゆうやけぐらむ</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <style type="text/css">
+
+        html, body{
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        body{
+            background-color: #000;
+            padding-bottom: 1px;
+        }
+
+        #wrapper{
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+            #imgContent{
+                display: none;
+            }
+
+            #wrapper #loadingImg{
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                margin: -16px 0 0 -16px;
+                width: 32px;
+                height: 32px;
+            }
+
+            #wrapper img{
+                width: 100%;
+            }
+
+            #wrapper img.hide{
+                display: none;
+            }
+
+        body.pc{
+            display: table;
+        }
+
+            body.pc #wrapper{
+                display: table-cell;
+                text-align: center;
+                vertical-align: middle;
+            }
+
+                body.pc #wrapper img{
+                    max-width: 612px;
+                }
+
+                body.pc #wrapper img.hide{
+                    display: none;
+                }
+
+        body.portrait{
+        }
+
+            body.portrait #wrapper{
+            }
+
+                body.portrait #wrapper #imgContent{
+                    position: absolute;
+                    left: 0;
+                    top: 50%;
+                    margin-top: -160px;
+                }
+
+        body.landscape{
+        }
+
+            body.landscape #wrapper{
+            }
+
+                body.landscape #wrapper #imgContent{
+                    position: absolute;
+                    right: 0;
+                    bottom: 0;
+                    width: 100%;
+                }
+
+                    body.landscape #wrapper #imgContent img{
+                        /*transform: rotate(-90deg);
+                        -moz-transform: rotate(-90deg);
+                        -webkit-transform: rotate(-90deg);*/
+                    }
+
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <img src="img/loading.gif" alt="load.." id="loadingImg">
+        <div id="imgContent"></div>
+    </div>
+
+    <script type="text/template" id="user-template">
+        <img src="<%= images.standard_resolution.url %>" class="show" />
+    </script>
+
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-35130195-1']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+    
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/underscore-min.js"></script>
+    <script type="text/javascript" src="js/backbone-min.js"></script>
+    <script type="text/javascript" src="js/handlebars-1.0.rc.1.js"></script>
+    <script type="text/javascript">
+
+        $.fn.setDblTap = function(){
+            return this.each(function(){
+
+                var $this = $(this);
+
+                $this.on("touchend", function(){
+
+                    if($this.data("tapFlag")){
+                        $this.trigger("dblTap");
+                        $this.data("tapFlag", false);
+                    }else{
+                        $this.data("tapFlag", true);
+                    }
+
+                    setTimeout(function(){
+                        $this.data("tapFlag", false);
+                    }, 500);
+
+                });
+
+            });
+        };
+
+        (function($){
+
+            var clientId = "f59edef0a756468da8b78b0126c0bf72",
+                tagName = "夕焼け";
+
+            var Instagram = Backbone.Model.extend({
+                dataCount: 1,
+                initialize: function(){
+                    this.fetch({
+                        url: "https://api.instagram.com/v1/tags/" + tagName + "/media/recent",
+                        dataType: "jsonp",
+                        data: {
+                            client_id: clientId
+                        }
+                    });
+                },
+                getNext: function(){
+                    this.fetch({
+                        url: this.attributes.pagination.next_url,
+                        dataType: "jsonp"
+                    });
+                }
+            });
+
+            var instagram = new Instagram();
+
+            var MyView = Backbone.View.extend({
+                el: "#wrapper",
+                model: instagram,
+                initialize: function(){
+                    _.bindAll(this, "render");
+                    _.bindAll(this, "runTimer");
+                    this.model.bind("change", this.runTimer);
+                    this.model.bind("change", this.render);
+                },
+                render: function(){
+                    var templateHTML = $("#user-template").html(),
+                        createdHTML = _.template(templateHTML, this.model.attributes.data[0]);
+
+                    $("#imgContent").html(createdHTML);
+                    $("#imgContent").append('<img src="' + this.model.attributes.data[1].images.standard_resolution.url + '" class="hide" />');
+
+                    $("#wrapper").fadeOut(1000, function(){
+
+                        $("#loadingImg").hide();
+                        $("#wrapper").show();
+                        $("#imgContent").fadeIn(1000);
+
+                    });
+                },
+                nextImg: function(){
+                    var self = this;
+
+                    this.model.dataCount++;
+
+                    console.log(this.model.dataCount);
+
+                    if(this.model.dataCount < 20){
+
+                        $("#imgContent .show")
+                            .fadeOut(1000, function(){
+                                $(this).remove();
+                                $("#imgContent .hide").fadeIn(1000, function(){
+                                    $(this).removeClass("hide").addClass("show");
+                                    $("#imgContent").append('<img src="' + self.model.attributes.data[self.model.dataCount].images.standard_resolution.url + '" class="hide" />');
+                                    self.runTimer();
+                                });
+                            })
+                        ;
+
+                    }else{
+
+                        this.model.dataCount = 1;
+
+                        $("#imgContent").fadeOut(1000, function(){
+                            $("#loadingImg").fadeIn(1000, function(){
+                                self.model.getNext();
+                            });
+                        });
+
+                    }
+                },
+                runTimer: function(){
+                    var self = this;
+
+                    setTimeout(function(){
+                        self.nextImg();
+                    }, 5000);
+                }
+            });
+
+            var myView = new MyView();
+
+            var ua = navigator.userAgent;
+
+            if(ua.match(/iphone/i) || ua.match(/ipod/i)){
+
+                $(window).on("load orientationchange", function(){
+                    if(Math.abs(window.orientation) === 90){
+                        $("body")
+                            .removeClass("portrait")
+                            .addClass("landscape")
+                        ;
+                    }else{
+                        $("body")
+                            .removeClass("landscape")
+                            .addClass("portrait")
+                        ;
+                    }
+                });
+
+            }else{
+
+                $("body").addClass("pc");
+
+            }
+
+            // $("#imgContent").setDblTap();
+            // $("#imgContent").on("dblTap", function(){
+            //     if($(this).hasClass("portrait")){
+            //         $(this).removeClass("portrait").addClass("landscape");
+            //         alert("landscape");
+            //     }else{
+            //         $("body").removeClass("landscape").addClass("portrait");
+            //     }
+            // });
+
+            setTimeout("window.scrollTo(0,1)", 100);
+
+        })(jQuery);
+    </script>
+</body>
+</html>
